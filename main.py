@@ -1,63 +1,77 @@
-import requests
+"""Exemplo de extração de dados com Azure Document Intelligence."""
+
+import argparse
 import os
 import time
+from pathlib import Path
+
+import requests
 from dotenv import load_dotenv
 
-# carrega as variáveis do .env
-load_dotenv()
+API_VERSION = "2023-10-31"
+TIMEOUT = 30
+INTERVALO = 2
+TENTATIVAS = 30
 
-# pega as credenciais do Azure
-FORM_RECOGNIZER_ENDPOINT = os.getenv("FORM_RECOGNIZER_ENDPOINT")
-FORM_RECOGNIZER_KEY = os.getenv("FORM_RECOGNIZER_KEY")
 
-# caminho do documento que vamos analisar
-documento = "assets/exemplo-documento.pdf"
-
-# função que envia o documento pro Azure Form Recognizer
-def analisar_documento(caminho_arquivo):
-    url = f"{FORM_RECOGNIZER_ENDPOINT}/formrecognizer/documentModels/prebuilt-document:analyze?api-version=2023-10-31"
+def analisar_documento(caminho: Path, endpoint: str, chave: str) -> dict:
+    url = (
+        f"{endpoint.rstrip('/')}/formrecognizer/documentModels/"
+        f"prebuilt-document:analyze?api-version={API_VERSION}"
+    )
     headers = {
         "Content-Type": "application/pdf",
-        "Ocp-Apim-Subscription-Key": FORM_RECOGNIZER_KEY
+        "Ocp-Apim-Subscription-Key": chave,
     }
 
-    with open(caminho_arquivo, "rb") as f:
-        documento = f.read()
+    with caminho.open("rb") as arquivo:
+        resposta = requests.post(url, headers=headers, data=arquivo, timeout=TIMEOUT)
+    resposta.raise_for_status()
+    if resposta.status_code != 202 or "operation-location" not in resposta.headers:
+        raise RuntimeError("O Azure não retornou o endereço da operação.")
 
-    response = requests.post(url, headers=headers, data=documento)
-    if response.status_code == 202:
-        return response.headers["operation-location"]
-    else:
-        print("Erro ao enviar documento:", response.text)
-        return None
+    url_resultado = resposta.headers["operation-location"]
+    for _ in range(TENTATIVAS):
+        resposta = requests.get(
+            url_resultado,
+            headers={"Ocp-Apim-Subscription-Key": chave},
+            timeout=TIMEOUT,
+        )
+        resposta.raise_for_status()
+        resultado = resposta.json()
+        estado = resultado.get("status")
 
-# função que busca o resultado da análise
-def buscar_resultado(url_resultado):
-    headers = {
-        "Ocp-Apim-Subscription-Key": FORM_RECOGNIZER_KEY
-    }
-    response = requests.get(url_resultado, headers=headers)
-    if response.status_code == 200:
-        return response.json()
-    else:
-        print("Erro ao buscar resultado:", response.text)
-        return None
+        if estado == "succeeded":
+            return resultado
+        if estado in {"failed", "canceled"}:
+            raise RuntimeError(f"Análise encerrada com status: {estado}")
+        time.sleep(INTERVALO)
 
-# executa o fluxo
-print("Enviando documento para análise...")
-url_resultado = analisar_documento(documento)
+    raise TimeoutError("A análise não terminou no tempo esperado.")
 
-if url_resultado:
-    print("Análise iniciada. Aguardando resultado...")
-    time.sleep(10)  # espera um pouco antes de buscar
 
-    resultado = buscar_resultado(url_resultado)
+def main() -> None:
+    parser = argparse.ArgumentParser(description="Extrai dados de um PDF com Azure.")
+    parser.add_argument("documento", type=Path, help="Caminho do arquivo PDF")
+    args = parser.parse_args()
 
-    if resultado:
-        print("Resultado da análise:")
-        for doc in resultado.get("analyzeResult", {}).get("documents", []):
-            print(doc)
-    else:
-        print("Não foi possível obter o resultado.")
-else:
-    print("Falha ao iniciar análise.")
+    load_dotenv()
+    endpoint = os.getenv("FORM_RECOGNIZER_ENDPOINT")
+    chave = os.getenv("FORM_RECOGNIZER_KEY")
+    if not endpoint or not chave:
+        parser.error("Defina FORM_RECOGNIZER_ENDPOINT e FORM_RECOGNIZER_KEY.")
+    if not args.documento.is_file() or args.documento.suffix.lower() != ".pdf":
+        parser.error("Informe um arquivo PDF existente.")
+
+    try:
+        resultado = analisar_documento(args.documento, endpoint, chave)
+    except (requests.RequestException, RuntimeError, TimeoutError) as erro:
+        parser.exit(1, f"Falha na análise: {erro}\n")
+
+    for pagina in resultado.get("analyzeResult", {}).get("pages", []):
+        for linha in pagina.get("lines", []):
+            print(linha.get("content", ""))
+
+
+if __name__ == "__main__":
+    main()
