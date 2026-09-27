@@ -1,60 +1,45 @@
-# Azure Document Analysis — Proof of Concept
+# Azure Document Analysis
 
-Proof of concept em Python para enviar um documento PDF ao **Azure Document Intelligence** (endpoint historicamente conhecido como Form Recognizer) e consultar o resultado da análise.
+Este projeto começou com uma ideia bem maior: estudar como Azure e Python poderiam ser usados em um fluxo de validação de documentos e, mais adiante, experimentar formas de detectar possíveis fraudes.
 
-Este repositório explora uma etapa que pode fazer parte de um fluxo futuro de validação documental. **No estado atual, ele não detecta fraude, não classifica documentos como legítimos ou fraudulentos e não deve ser usado para decisões reais de segurança ou conformidade.**
+O código ainda está no começo desse caminho.
 
-## Estado atual
+Hoje ele faz uma coisa específica: envia um PDF para o Azure Document Intelligence e consulta o resultado da análise. Ainda não existe detecção de fraude no projeto.
 
-O código implementado em `main.py`:
+Prefiro deixar isso claro aqui do que apresentar como pronto algo que ainda quero construir.
 
-1. carrega o endpoint e a chave do Azure por variáveis de ambiente;
-2. lê um PDF local;
-3. envia o documento ao modelo `prebuilt-document`;
-4. recebe a URL da operação assíncrona;
-5. aguarda antes de consultar o resultado;
-6. imprime os documentos retornados pela API.
+## O que funciona hoje
 
-Fluxo atual:
+O fluxo atual está em `main.py`:
+
+1. o programa lê o endpoint e a chave do Azure pelo arquivo `.env`;
+2. abre um PDF local;
+3. envia o arquivo para o modelo `prebuilt-document`;
+4. recebe o endereço da operação criada pelo Azure;
+5. espera alguns segundos;
+6. consulta o resultado e mostra a resposta no terminal.
+
+Em resumo:
 
 ```text
-PDF local
-   ↓
-Python / requests
-   ↓
+PDF
+ ↓
+Python
+ ↓
 Azure Document Intelligence
-   ↓
-Resultado da extração
-   ↓
-Saída no terminal
+ ↓
+Extração do documento
+ ↓
+Resultado no terminal
 ```
 
-## O que este projeto ainda NÃO implementa
+É um proof of concept, não uma aplicação pronta para produção.
 
-Para evitar confundir protótipo com produto pronto, estes recursos não fazem parte do código atual:
+## Como testar
 
-- detecção ou classificação de fraude;
-- análise de assinatura;
-- Azure Computer Vision;
-- OpenAI ou outro LLM;
-- FastAPI ou API REST própria;
-- dashboard;
-- banco de dados ou audit log;
-- Azure Key Vault;
-- Application Insights;
-- score de fraude ou métricas de acurácia;
-- garantias de LGPD, ISO 27001 ou OWASP;
-- métricas de produção, SLA, throughput ou custo por documento.
+Você precisa de Python 3.10 ou superior e de um recurso do Azure Document Intelligence com endpoint e chave válidos.
 
-Esses itens só devem ser descritos como implementados quando houver código, configuração e evidências correspondentes no repositório.
-
-## Requisitos
-
-- Python 3.10+
-- uma conta Azure com um recurso compatível de Document Intelligence
-- endpoint e chave de acesso válidos
-
-Instale as dependências:
+Clone o projeto e crie o ambiente virtual:
 
 ```bash
 git clone https://github.com/azenhasoft/azure-doc-fraud-detector.git
@@ -63,72 +48,94 @@ cd azure-doc-fraud-detector
 python -m venv .venv
 ```
 
-Ative o ambiente virtual e execute:
+Depois de ativar o ambiente:
 
 ```bash
 pip install -r requirements.txt
 ```
 
-Crie seu arquivo `.env` local a partir do exemplo:
+Crie um arquivo `.env` local seguindo o modelo de `.env.example`:
 
 ```text
 FORM_RECOGNIZER_ENDPOINT=https://seu-recurso.cognitiveservices.azure.com
 FORM_RECOGNIZER_KEY=sua-chave
 ```
 
-> Nunca faça commit de chaves reais. O arquivo `.env` está listado no `.gitignore`.
+O `.env` não deve ser enviado para o GitHub.
 
-## Executando
-
-O script atualmente espera um PDF no caminho:
-
-```text
-assets/exemplo-documento.pdf
-```
-
-Depois:
+Para executar:
 
 ```bash
 python main.py
 ```
 
-Como o repositório ainda não inclui um documento de exemplo, você precisa criar a pasta `assets` e fornecer um PDF próprio para realizar o teste.
+No estado atual, o script procura o documento neste caminho:
 
-## Limitações técnicas atuais
+```text
+assets/exemplo-documento.pdf
+```
 
-O projeto ainda é um experimento pequeno e possui limitações deliberadamente documentadas:
+O repositório não inclui esse PDF. Para testar, é preciso criar a pasta `assets` e colocar nela um documento próprio com esse nome.
 
-- o caminho do PDF está fixo no código;
-- o `Content-Type` está fixo como `application/pdf`;
-- a consulta da operação usa uma espera fixa de 10 segundos em vez de polling robusto;
-- não há validação explícita das variáveis de ambiente;
-- não há tratamento estruturado de exceções de rede;
-- não há testes automatizados;
-- não há CLI com argumentos;
-- o resultado é apenas impresso no terminal.
+## O que ainda não existe
 
-## Roadmap
+A ideia original do projeto envolvia muito mais coisas do que o código atual implementa.
 
-A evolução do projeto pode ser feita em etapas verificáveis:
+Por enquanto, **não há**:
 
-- [ ] aceitar o caminho do documento por argumento de linha de comando;
-- [ ] validar configuração e arquivo antes do envio;
-- [ ] substituir a espera fixa por polling do status da operação;
-- [ ] melhorar tratamento de erros e timeouts;
-- [ ] criar testes para a lógica que puder ser isolada da API;
-- [ ] adicionar um PDF sintético de demonstração sem dados pessoais;
-- [ ] estruturar a saída extraída em um formato próprio;
-- [ ] experimentar regras de validação documental;
-- [ ] somente depois, pesquisar e prototipar sinais de fraude com datasets e métricas apropriados.
+- classificação de documentos como fraudulentos ou legítimos;
+- análise de assinatura ou adulteração de imagem;
+- Azure Computer Vision;
+- integração com OpenAI ou outro LLM;
+- FastAPI;
+- dashboard;
+- banco de dados;
+- score de fraude;
+- métricas de acurácia;
+- Key Vault ou Application Insights.
 
-Uma futura solução de detecção de fraude exigiria dados rotulados, critérios de avaliação, testes e validação muito além da simples extração de documentos.
+Também não tenho dados que sustentem números de acurácia, desempenho, custo por documento ou volume processado. Quando houver algo desse tipo, quero que venha de teste e medição, não de estimativa colocada no README.
 
-## Segurança
+## Limitações do código atual
 
-Credenciais devem existir apenas no ambiente local ou em um serviço apropriado de gerenciamento de segredos. Caso uma chave tenha sido publicada anteriormente em um commit, removê-la do arquivo atual **não invalida a credencial**: ela deve ser revogada/rotacionada no provedor.
+Há bastante espaço para melhorar o próprio protótipo.
 
-## Objetivo do repositório
+O caminho do PDF ainda está escrito diretamente no código. O programa também espera dez segundos antes de consultar o Azure, em vez de acompanhar o status da operação até ela terminar.
 
-Este projeto é mantido como registro de aprendizado e como ponto de partida para explorar processamento documental com Python e Azure.
+Ainda faltam validações para configuração e arquivo, tratamento melhor de erros de rede e testes automatizados.
 
-A intenção do roadmap é evoluir o protótipo por meio de implementações demonstráveis, mantendo a documentação alinhada ao código.
+Tudo isso vem antes de transformar o projeto em algo maior.
+
+## Onde quero chegar
+
+Minha ideia é evoluir por partes:
+
+- [ ] receber o caminho do documento pela linha de comando
+- [ ] validar arquivo e configuração antes do envio
+- [ ] acompanhar corretamente o status da operação no Azure
+- [ ] melhorar mensagens e tratamento de erros
+- [ ] criar testes para as partes que não dependem diretamente da API
+- [ ] adicionar um documento fictício para demonstração
+- [ ] organizar melhor os dados retornados pelo Azure
+- [ ] experimentar regras simples de validação documental
+- [ ] estudar uma abordagem real para detecção de fraude
+
+A última etapa é justamente a mais difícil.
+
+Extrair informações de um documento e detectar fraude são problemas diferentes. Para chamar este projeto de detector de fraude, eu precisaria ter dados adequados, critérios de avaliação e resultados que mostrassem que a detecção realmente funciona.
+
+Ainda não cheguei lá.
+
+## Sobre segurança
+
+As credenciais do Azure ficam em variáveis de ambiente e o arquivo `.env` está no `.gitignore`.
+
+Se uma chave real for publicada por engano em algum momento, apenas apagar o arquivo do repositório não resolve o problema, porque ela pode continuar no histórico do Git. Nesse caso, a chave precisa ser revogada e substituída no Azure.
+
+## Por que mantenho este projeto
+
+Porque ele mostra uma parte do aprendizado que ainda está acontecendo.
+
+A primeira versão da ideia era ambiciosa demais para o código que eu tinha. Em vez de apagar o projeto ou fingir que tudo aquilo já estava implementado, preferi voltar ao que realmente funciona e continuar dali.
+
+Se um dia este repositório se tornar de fato um detector de fraude, quero conseguir olhar o histórico e ver como cheguei até lá.
